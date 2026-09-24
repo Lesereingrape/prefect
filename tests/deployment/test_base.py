@@ -8,6 +8,7 @@ import prefect
 from prefect.deployments.base import (
     _deployment_already_saved_to_prefect_file,
     configure_project_by_recipe,
+    create_default_prefect_yaml,
     initialize_project,
 )
 from prefect.utilities.filesystem import tmpchdir
@@ -75,6 +76,24 @@ class TestRecipes:
             "prefect.deployments.steps.set_working_directory"
         ]
         assert clone_step["directory"] == "/opt/prefect/test-dir"
+
+
+class TestCreateDefaultPrefectYaml:
+    async def test_contents_defaults_are_used_when_not_provided(self, tmp_path):
+        assert create_default_prefect_yaml(".") is True
+
+        contents = yaml.safe_load(Path("prefect.yaml").read_text())
+        assert contents["prefect-version"] == prefect.__version__
+        assert contents["name"] == tmp_path.name
+
+    async def test_name_falls_back_to_the_project_directory(self, tmp_path):
+        project_dir = tmp_path / "my-project"
+        project_dir.mkdir()
+
+        assert create_default_prefect_yaml(str(project_dir), contents={}) is True
+
+        contents = yaml.safe_load((project_dir / "prefect.yaml").read_text())
+        assert contents["name"] == "my-project"
 
 
 class TestInitProject:
