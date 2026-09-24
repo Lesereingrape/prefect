@@ -7,6 +7,7 @@ from functools import partial
 from time import sleep
 from uuid import uuid4
 
+import anyio
 import cloudpickle
 import pytest
 
@@ -387,6 +388,38 @@ class TestFileSystemLockManager:
         assert not store.acquire_lock(key=key, holder="holder2", acquire_timeout=0.1)
         store.release_lock(key=key, holder="holder1")
         assert not store.is_locked(key=key)
+
+    def test_acquire_lock_with_zero_acquire_timeout(self, store):
+        key = str(uuid4())
+        assert store.acquire_lock(key=key, holder="holder1")
+
+        # `acquire_timeout=0` means "do not wait", so the call must return
+        # immediately instead of polling; run it in a thread so a regression
+        # fails here rather than hanging the suite.
+        outcomes: queue.Queue = queue.Queue()
+        thread = threading.Thread(
+            target=lambda: outcomes.put(
+                store.acquire_lock(key=key, holder="holder2", acquire_timeout=0)
+            ),
+            daemon=True,
+        )
+        thread.start()
+        thread.join(timeout=1)
+
+        assert not thread.is_alive(), (
+            "acquire_lock(acquire_timeout=0) kept waiting on a held lock"
+        )
+        assert outcomes.get_nowait() is False
+        store.release_lock(key=key, holder="holder1")
+
+    async def test_aacquire_lock_with_zero_acquire_timeout(self, store):
+        key = str(uuid4())
+        assert await store.aacquire_lock(key=key, holder="holder1")
+        with anyio.fail_after(1):
+            assert not await store.aacquire_lock(
+                key=key, holder="holder2", acquire_timeout=0
+            )
+        store.release_lock(key=key, holder="holder1")
 
     def test_acquire_lock_when_previously_holder_timed_out(self, store, clock: _Clock):
         key = str(uuid4())

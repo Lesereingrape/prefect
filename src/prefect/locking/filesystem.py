@@ -230,7 +230,7 @@ class FileSystemLockManager(LockManager):
     def wait_for_lock(self, key: str, timeout: Optional[float] = None) -> bool:
         seconds_waited = 0
         while self.is_locked(key, use_cache=False):
-            if timeout and seconds_waited >= timeout:
+            if timeout is not None and seconds_waited >= timeout:
                 return False
             seconds_waited += 0.1
             time.sleep(0.1)
@@ -239,7 +239,7 @@ class FileSystemLockManager(LockManager):
     async def await_for_lock(self, key: str, timeout: Optional[float] = None) -> bool:
         seconds_waited = 0
         while self.is_locked(key, use_cache=False):
-            if timeout and seconds_waited >= timeout:
+            if timeout is not None and seconds_waited >= timeout:
                 return False
             seconds_waited += 0.1
             await anyio.sleep(0.1)
